@@ -27,19 +27,13 @@ type AppState struct {
 	activeMonitorIndex   int
 	activeWorkspaceIndex int
 	activeLayout         string
-	workspaces           []contracts.Workspace
 	isPaused             bool
 	mu                   sync.Mutex
 }
 
-type WorkspaceButton struct {
-	button   *systray.MenuItem
-	stopChan chan struct{}
-}
-
 type AppMenuItems struct {
 	activeWorkspaceIndicator *systray.MenuItem
-	workspaceChangeBtns      map[string]*WorkspaceButton
+	workspaceChangeBtns      map[string]*systray.MenuItem
 	activeLayoutIndicator    *systray.MenuItem
 	layoutChangeBtns         map[string]*systray.MenuItem
 	pauseBtn                 *systray.MenuItem
@@ -51,15 +45,14 @@ func GetApp() *App {
 	once.Do(func() {
 		instance = &App{
 			state: AppState{
-				activeMonitorIndex:   99,
+				activeMonitorIndex:   0,
 				activeWorkspaceIndex: 0,
 				activeLayout:         "",
-				workspaces:           nil,
 				isPaused:             false,
 			},
 			menu: AppMenuItems{
 				layoutChangeBtns:    make(map[string]*systray.MenuItem),
-				workspaceChangeBtns: make(map[string]*WorkspaceButton),
+				workspaceChangeBtns: make(map[string]*systray.MenuItem),
 			},
 		}
 	})
@@ -73,6 +66,13 @@ func (a *App) Init(eventManager *events.Manager) {
 	systray.SetTooltip("Komorebit")
 
 	a.menu.activeWorkspaceIndicator = systray.AddMenuItem("Active workspace: ???", "Indicates the active workspace")
+	workspaceButtonCount := 10
+	for i := 0; i < workspaceButtonCount; i++ {
+		btnTitle := "Workspace " + strconv.Itoa(i+1)
+		btn := a.menu.activeWorkspaceIndicator.AddSubMenuItem(btnTitle, btnTitle)
+		a.menu.workspaceChangeBtns[btnTitle] = btn
+		go a.handleWorkspaceChangeButton(btn, i)
+	}
 
 	a.menu.activeLayoutIndicator = systray.AddMenuItem("Current layout: ???", "Indicates the current layout")
 	layoutOptions := []string{"bsp", "columns", "rows", "vertical-stack", "horizontal-stack", "ultrawide-vertical-stack", "grid", "right-main-vertical-stack"}
@@ -102,9 +102,7 @@ func (a *App) HandleEvent(eventData contracts.EventData) {
 	activeMonitorIndex := int(eventData.State.Monitors.Focused)
 	activeWorkspaceIndex := int(eventData.State.Monitors.Elements[activeMonitorIndex].Workspaces.Focused)
 	activeLayout := eventData.State.Monitors.Elements[activeMonitorIndex].Workspaces.Elements[activeWorkspaceIndex].Layout.Default
-	workspaces := eventData.State.Monitors.Elements[activeMonitorIndex].Workspaces.Elements
 
-	a.setWorkspaces(workspaces)
 	a.setActiveWorkspaceIndex(activeWorkspaceIndex)
 	a.setActiveLayout(activeLayout)
 	a.setActiveMonitorIndex(activeMonitorIndex)
@@ -119,17 +117,13 @@ func (a *App) handleLayoutChangeButton(button *systray.MenuItem, layout string) 
 	}
 }
 
-func (a *App) handleWorkspaceChangeButton(button *systray.MenuItem, workspace int, stopChan <-chan struct{}) {
+func (a *App) handleWorkspaceChangeButton(button *systray.MenuItem, workspace int) {
 	for {
-		select {
-		case <-button.ClickedCh:
-			requestedWorkspaceIndex := strconv.Itoa(workspace)
-			fmt.Println("Requesting workspace change")
-			komorebic.Exec([]string{"focus-workspace", requestedWorkspaceIndex})
-			fmt.Println("Finished workspace change")
-		case <-stopChan:
-			return
-		}
+		<-button.ClickedCh
+		requestedWorkspaceIndex := strconv.Itoa(workspace)
+		fmt.Println("Requesting workspace change")
+		komorebic.Exec([]string{"focus-workspace", requestedWorkspaceIndex})
+		fmt.Println("Finished workspace change")
 	}
 }
 
@@ -170,11 +164,6 @@ func (a *App) handleQuitButton() {
 func (a *App) setActiveMonitorIndex(index int) {
 	a.state.mu.Lock()
 	defer a.state.mu.Unlock()
-	oldIndex := a.state.activeMonitorIndex
-	if oldIndex != index {
-		a.teardownWorkspaceMenuItems()
-		a.generateWorkspaceMenuItems()
-	}
 	a.state.activeMonitorIndex = index
 }
 
@@ -192,34 +181,6 @@ func (a *App) setActiveLayout(layout string) {
 	a.state.activeLayout = layout
 	if a.state.activeLayout != "" {
 		a.menu.activeLayoutIndicator.SetTitle("Current layout: " + a.state.activeLayout)
-	}
-}
-
-func (a *App) setWorkspaces(workspaces []contracts.Workspace) {
-	a.state.mu.Lock()
-	defer a.state.mu.Unlock()
-	a.state.workspaces = workspaces
-}
-
-func (a *App) teardownWorkspaceMenuItems() {
-	for _, workspaceBtn := range a.menu.workspaceChangeBtns {
-		close(workspaceBtn.stopChan)
-		workspaceBtn.button.Disable()
-		workspaceBtn.button.Hide()
-	}
-	a.menu.workspaceChangeBtns = make(map[string]*WorkspaceButton)
-}
-
-func (a *App) generateWorkspaceMenuItems() {
-	for i, _ := range a.state.workspaces {
-		btnTitle := "Workspace " + strconv.Itoa(i+1)
-		btn := a.menu.activeWorkspaceIndicator.AddSubMenuItem(btnTitle, btnTitle)
-		stopChan := make(chan struct{})
-		a.menu.workspaceChangeBtns[btnTitle] = &WorkspaceButton{
-			button:   btn,
-			stopChan: stopChan,
-		}
-		go a.handleWorkspaceChangeButton(btn, i, stopChan)
 	}
 }
 
