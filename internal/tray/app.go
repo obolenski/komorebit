@@ -1,12 +1,12 @@
 package tray
 
 import (
-	"encoding/json"
 	"fmt"
 	"komorebit/internal/contracts"
 	"komorebit/internal/events"
 	"komorebit/internal/icons"
 	"komorebit/internal/komorebic"
+	"strconv"
 	"sync"
 
 	"github.com/getlantern/systray"
@@ -24,16 +24,22 @@ type App struct {
 }
 
 type AppState struct {
+	activeMonitorIndex   int
 	activeWorkspaceIndex int
-	activeWorkspaceName  string
 	activeLayout         string
+	workspaces           []contracts.Workspace
 	isPaused             bool
 	mu                   sync.Mutex
 }
 
+type WorkspaceButton struct {
+	button   *systray.MenuItem
+	stopChan chan struct{}
+}
+
 type AppMenuItems struct {
 	activeWorkspaceIndicator *systray.MenuItem
-	workspaceChangeBtns      map[string]*systray.MenuItem
+	workspaceChangeBtns      map[string]*WorkspaceButton
 	activeLayoutIndicator    *systray.MenuItem
 	layoutChangeBtns         map[string]*systray.MenuItem
 	pauseBtn                 *systray.MenuItem
@@ -45,14 +51,15 @@ func GetApp() *App {
 	once.Do(func() {
 		instance = &App{
 			state: AppState{
+				activeMonitorIndex:   99,
 				activeWorkspaceIndex: 0,
-				activeWorkspaceName:  "",
 				activeLayout:         "",
+				workspaces:           nil,
 				isPaused:             false,
 			},
 			menu: AppMenuItems{
 				layoutChangeBtns:    make(map[string]*systray.MenuItem),
-				workspaceChangeBtns: make(map[string]*systray.MenuItem),
+				workspaceChangeBtns: make(map[string]*WorkspaceButton),
 			},
 		}
 	})
@@ -65,35 +72,9 @@ func (a *App) Init(eventManager *events.Manager) {
 	systray.SetTitle("Komorebit")
 	systray.SetTooltip("Komorebit")
 
-	currentState, err := komorebic.Exec([]string{"state"})
-	if err != nil {
-		fmt.Println("Error getting komorebi state")
-		systray.SetIcon(icons.SadIcon())
-		return
-	}
-	var state contracts.State
-	err = json.Unmarshal([]byte(currentState), &state)
+	a.menu.activeWorkspaceIndicator = systray.AddMenuItem("Active workspace: ???", "Indicates the active workspace")
 
-	if err != nil {
-		fmt.Println("Error unmarshalling komorebi state")
-		systray.SetIcon(icons.SadIcon())
-		return
-	}
-
-	activeMonitorIndex := int(state.Monitors.Focused)
-	activeWorkspaceIndex := int(state.Monitors.Elements[activeMonitorIndex].Workspaces.Focused)
-	activeWorkspaceName := state.Monitors.Elements[activeMonitorIndex].Workspaces.Elements[activeWorkspaceIndex].Name
-	activeLayout := state.Monitors.Elements[activeMonitorIndex].Workspaces.Elements[activeWorkspaceIndex].Layout.Default
-
-	a.menu.activeWorkspaceIndicator = systray.AddMenuItem("Active workspace: "+activeWorkspaceName, "Indicates the active workspace")
-	workspaces := state.Monitors.Elements[activeMonitorIndex].Workspaces.Elements
-	for _, workspace := range workspaces {
-		btn := a.menu.activeWorkspaceIndicator.AddSubMenuItem(workspace.Name, workspace.Name)
-		a.menu.workspaceChangeBtns[workspace.Name] = btn
-		go a.handleWorkspaceChangeButton(btn, workspace.Name)
-	}
-
-	a.menu.activeLayoutIndicator = systray.AddMenuItem("Current layout: "+activeLayout, "Indicates the current layout")
+	a.menu.activeLayoutIndicator = systray.AddMenuItem("Current layout: ???", "Indicates the current layout")
 	layoutOptions := []string{"bsp", "columns", "rows", "vertical-stack", "horizontal-stack", "ultrawide-vertical-stack", "grid", "right-main-vertical-stack"}
 	for _, layout := range layoutOptions {
 		btn := a.menu.activeLayoutIndicator.AddSubMenuItem(layout, layout)
@@ -120,13 +101,13 @@ func (a *App) HandleEvent(eventData contracts.EventData) {
 
 	activeMonitorIndex := int(eventData.State.Monitors.Focused)
 	activeWorkspaceIndex := int(eventData.State.Monitors.Elements[activeMonitorIndex].Workspaces.Focused)
-	activeWorkspaceName := eventData.State.Monitors.Elements[activeMonitorIndex].Workspaces.Elements[activeWorkspaceIndex].Name
 	activeLayout := eventData.State.Monitors.Elements[activeMonitorIndex].Workspaces.Elements[activeWorkspaceIndex].Layout.Default
+	workspaces := eventData.State.Monitors.Elements[activeMonitorIndex].Workspaces.Elements
 
+	a.setWorkspaces(workspaces)
 	a.setActiveWorkspaceIndex(activeWorkspaceIndex)
-	a.setActiveWorkspaceName(activeWorkspaceName)
 	a.setActiveLayout(activeLayout)
-
+	a.setActiveMonitorIndex(activeMonitorIndex)
 }
 
 func (a *App) handleLayoutChangeButton(button *systray.MenuItem, layout string) {
@@ -138,12 +119,17 @@ func (a *App) handleLayoutChangeButton(button *systray.MenuItem, layout string) 
 	}
 }
 
-func (a *App) handleWorkspaceChangeButton(button *systray.MenuItem, workspace string) {
+func (a *App) handleWorkspaceChangeButton(button *systray.MenuItem, workspace int, stopChan <-chan struct{}) {
 	for {
-		<-button.ClickedCh
-		fmt.Println("Requesting workspace change")
-		komorebic.Exec([]string{"focus-named-workspace", workspace})
-		fmt.Println("Finished workspace change")
+		select {
+		case <-button.ClickedCh:
+			requestedWorkspaceIndex := strconv.Itoa(workspace)
+			fmt.Println("Requesting workspace change")
+			komorebic.Exec([]string{"focus-workspace", requestedWorkspaceIndex})
+			fmt.Println("Finished workspace change")
+		case <-stopChan:
+			return
+		}
 	}
 }
 
@@ -181,20 +167,23 @@ func (a *App) handleQuitButton() {
 	fmt.Println("Finished quitting")
 }
 
+func (a *App) setActiveMonitorIndex(index int) {
+	a.state.mu.Lock()
+	defer a.state.mu.Unlock()
+	oldIndex := a.state.activeMonitorIndex
+	if oldIndex != index {
+		a.teardownWorkspaceMenuItems()
+		a.generateWorkspaceMenuItems()
+	}
+	a.state.activeMonitorIndex = index
+}
+
 func (a *App) setActiveWorkspaceIndex(index int) {
 	a.state.mu.Lock()
 	defer a.state.mu.Unlock()
 	a.state.activeWorkspaceIndex = index
 	a.updateWorkspaceIcon()
-}
-
-func (a *App) setActiveWorkspaceName(name string) {
-	a.state.mu.Lock()
-	defer a.state.mu.Unlock()
-	a.state.activeWorkspaceName = name
-	if a.state.activeWorkspaceName != "" {
-		a.menu.activeWorkspaceIndicator.SetTitle("Active workspace: " + a.state.activeWorkspaceName)
-	}
+	a.menu.activeWorkspaceIndicator.SetTitle("Active workspace: " + strconv.Itoa(index+1))
 }
 
 func (a *App) setActiveLayout(layout string) {
@@ -203,6 +192,34 @@ func (a *App) setActiveLayout(layout string) {
 	a.state.activeLayout = layout
 	if a.state.activeLayout != "" {
 		a.menu.activeLayoutIndicator.SetTitle("Current layout: " + a.state.activeLayout)
+	}
+}
+
+func (a *App) setWorkspaces(workspaces []contracts.Workspace) {
+	a.state.mu.Lock()
+	defer a.state.mu.Unlock()
+	a.state.workspaces = workspaces
+}
+
+func (a *App) teardownWorkspaceMenuItems() {
+	for _, workspaceBtn := range a.menu.workspaceChangeBtns {
+		close(workspaceBtn.stopChan)
+		workspaceBtn.button.Disable()
+		workspaceBtn.button.Hide()
+	}
+	a.menu.workspaceChangeBtns = make(map[string]*WorkspaceButton)
+}
+
+func (a *App) generateWorkspaceMenuItems() {
+	for i, _ := range a.state.workspaces {
+		btnTitle := "Workspace " + strconv.Itoa(i+1)
+		btn := a.menu.activeWorkspaceIndicator.AddSubMenuItem(btnTitle, btnTitle)
+		stopChan := make(chan struct{})
+		a.menu.workspaceChangeBtns[btnTitle] = &WorkspaceButton{
+			button:   btn,
+			stopChan: stopChan,
+		}
+		go a.handleWorkspaceChangeButton(btn, i, stopChan)
 	}
 }
 
