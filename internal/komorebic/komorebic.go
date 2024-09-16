@@ -1,13 +1,11 @@
 package komorebic
 
 import (
-	"os"
 	"os/exec"
 )
 
-func Exec(args []string) error {
+func Exec(args []string) (string, error) {
 	cmd := exec.Command("komorebic.exe", args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	output, err := cmd.Output()
+	return string(output), err
 }

@@ -1,4 +1,4 @@
-package komorebi
+package contracts
 
 type EventData struct {
 	Event Event `json:"event"`
