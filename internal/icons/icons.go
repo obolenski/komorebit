@@ -23,6 +23,10 @@ func loadAllIcons() {
 	icons["pause"] = generated.Pause
 	icons["sad"] = generated.Sad
 	icons["tilde"] = generated.Tilde
+	icons["workspaces"] = generated.Workspaces
+	icons["layouts"] = generated.Layouts
+	icons["refresh"] = generated.Refresh
+	icons["quit"] = generated.Quit
 }
 
 func WorkspaceIcon(workspaceIndex int) []byte {
@@ -62,4 +66,20 @@ func SadIcon() []byte {
 
 func TildeIcon() []byte {
 	return icons["tilde"]
+}
+
+func WorkspacesIcon() []byte {
+	return icons["workspaces"]
+}
+
+func LayoutsIcon() []byte {
+	return icons["layouts"]
+}
+
+func RefreshIcon() []byte {
+	return icons["refresh"]
+}
+
+func QuitIcon() []byte {
+	return icons["quit"]
 }

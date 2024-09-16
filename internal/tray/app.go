@@ -66,6 +66,7 @@ func (a *App) Init(eventManager *events.Manager) {
 	systray.SetTooltip("Komorebit")
 
 	a.menu.activeWorkspaceIndicator = systray.AddMenuItem("Active workspace: ???", "Indicates the active workspace")
+	a.menu.activeWorkspaceIndicator.SetIcon(icons.WorkspacesIcon())
 	workspaceButtonCount := 10
 	for i := 0; i < workspaceButtonCount; i++ {
 		btnTitle := "Workspace " + strconv.Itoa(i+1)
@@ -75,6 +76,7 @@ func (a *App) Init(eventManager *events.Manager) {
 	}
 
 	a.menu.activeLayoutIndicator = systray.AddMenuItem("Current layout: ???", "Indicates the current layout")
+	a.menu.activeLayoutIndicator.SetIcon(icons.LayoutsIcon())
 	layoutOptions := []string{"bsp", "columns", "rows", "vertical-stack", "horizontal-stack", "ultrawide-vertical-stack", "grid", "right-main-vertical-stack"}
 	for _, layout := range layoutOptions {
 		btn := a.menu.activeLayoutIndicator.AddSubMenuItem(layout, layout)
@@ -84,9 +86,12 @@ func (a *App) Init(eventManager *events.Manager) {
 
 	systray.AddSeparator()
 	a.menu.pauseBtn = systray.AddMenuItem("Pause/unpause komorebi", "Pause/unpause komorebi (komorebic toggle-pause)")
+	a.menu.pauseBtn.SetIcon(icons.PauseIcon())
 	a.menu.reloadBtn = systray.AddMenuItem("Reload komorebi", "Reload komorebi (komorebic stop; komorebic start)")
+	a.menu.reloadBtn.SetIcon(icons.RefreshIcon())
 	systray.AddSeparator()
 	a.menu.quitBtn = systray.AddMenuItem("Quit komorebit", "Quit the app (does not affect komorebi)")
+	a.menu.quitBtn.SetIcon(icons.QuitIcon())
 
 	go a.handlePauseButton()
 	go a.handleReloadButton()

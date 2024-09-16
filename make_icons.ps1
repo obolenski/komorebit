@@ -70,7 +70,11 @@ New-Item -ItemType Directory -Path $goOutFolder | Out-Null
     [PsCustomObject]@{ display = "10"; name = "Ten" },
     [PsCustomObject]@{ display = "`u{db80}`u{dfe4}"; name = "Pause" },
     [PsCustomObject]@{ display = ":("; name = "Sad" },
-    [PsCustomObject]@{ display = "`u{db81}`u{df25}"; name = "Tilde" }
+    [PsCustomObject]@{ display = "`u{db81}`u{df25}"; name = "Tilde" },
+    [PSCustomObject]@{ display = "`u{ebf6}"; name = "Workspaces" },
+    [PSCustomObject]@{ display = "`u{ebeb}"; name = "Layouts" },
+    [PSCustomObject]@{ display = "`u{f021}"; name = "Refresh" },
+    [PSCustomObject]@{ display = "`u{f0206}"; name = "Quit" }
 )
 
 foreach ($icon in $icons) {
