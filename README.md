@@ -12,7 +12,7 @@ Yet another tray indicator for [komorebi](https://github.com/LGUG2Z/komorebi/)
 - Komorebi restart button (komorebic stop; komorebic start)
 
 ## Similar tools / inspired by
-### Compared to [komotray](https://github.com/joshprk/komotray)
+### Compared to [komotray](https://github.com/urob/komotray)
 - Doesn't wrap around komorebi
 - Doesn't come with keybindings
 ### Compared to [komotray](https://github.com/joshprk/komotray)
