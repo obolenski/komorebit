@@ -7,7 +7,7 @@ Yet another tray indicator for [komorebi](https://github.com/LGUG2Z/komorebi/)
 
 ## Features
 - Active workspace indicator (active monitor) and switching menu
-- Acive layout inidicator (active monitor) and switching menu
+- Active layout indicator (active monitor) and switching menu
 - Komorebi pause indicator and button
 - Komorebi restart button (komorebic stop; komorebic start)
 
