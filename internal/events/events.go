@@ -8,6 +8,7 @@ import (
 	"komorebit/internal/komorebic"
 	"net"
 	"os"
+	"sync"
 
 	"github.com/Microsoft/go-winio"
 )
@@ -19,12 +20,15 @@ type EventHandler interface {
 type Manager struct {
 	handler  EventHandler
 	stopChan chan struct{}
+	stopped  bool
+	mu       sync.Mutex
 }
 
 func NewManager(handler EventHandler) *Manager {
 	return &Manager{
 		handler:  handler,
 		stopChan: make(chan struct{}),
+		stopped:  false,
 	}
 }
 
@@ -33,12 +37,21 @@ func (m *Manager) Start() {
 }
 
 func (m *Manager) Stop() {
-	close(m.stopChan)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if !m.stopped {
+		close(m.stopChan)
+		m.stopped = true
+	}
 }
 
 func (m *Manager) Restart() {
 	m.Stop()
+	m.mu.Lock()
 	m.stopChan = make(chan struct{})
+	m.stopped = false
+	m.mu.Unlock()
 	m.Start()
 }
 

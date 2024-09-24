@@ -8,6 +8,7 @@ import (
 	"komorebit/internal/komorebic"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/getlantern/systray"
 )
@@ -28,6 +29,7 @@ type AppState struct {
 	activeWorkspaceIndex int
 	activeLayout         string
 	isPaused             bool
+	isSad                bool
 	mu                   sync.Mutex
 }
 
@@ -96,6 +98,8 @@ func (a *App) Init(eventManager *events.Manager) {
 	go a.handlePauseButton()
 	go a.handleReloadButton()
 	go a.handleQuitButton()
+
+	go a.monitorKomorebi()
 }
 
 func (a *App) HandleEvent(eventData contracts.EventData) {
@@ -208,9 +212,48 @@ func (a *App) updateIcon() {
 	}
 }
 
+func (a *App) monitorKomorebi() {
+	for {
+		_, err := komorebic.Exec([]string{"state"})
+		if err != nil && !a.state.isSad {
+			fmt.Println("Komorebi is not running. Entering sad state...")
+			a.beSad()
+		}
+		time.Sleep(1 * time.Second)
+	}
+}
+
+func (a *App) beSad() {
+	a.stopEvents()
+	a.state.mu.Lock()
+	a.state.isSad = true
+	a.state.mu.Unlock()
+	systray.SetIcon(icons.SadIcon())
+	go a.hope()
+}
+
+func (a *App) hope() {
+	for {
+		fmt.Println("Hoping...")
+		_, err := komorebic.Exec([]string{"state"})
+		if err == nil {
+			fmt.Println("Komorebi is running again. Recovering from sad state...")
+			a.state.mu.Lock()
+			a.state.isSad = false
+			a.state.mu.Unlock()
+			a.initEvents()
+			a.updateIcon()
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+}
+
 func (a *App) stopEvents() {
 	events.Unsubscribe()
-	a.eventManager.Stop()
+	if a.eventManager != nil {
+		a.eventManager.Stop()
+	}
 }
 
 func (a *App) initEvents() {
