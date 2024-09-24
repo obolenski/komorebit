@@ -100,6 +100,9 @@ func (m *Manager) handleClient(conn net.Conn) {
 		notification, err := reader.ReadBytes('\n')
 		if err != nil {
 			fmt.Println("Client disconnected")
+			m.handler.HandleEvent(contracts.EventData{
+				Event: contracts.Event{Type: "KomorebiStopped"},
+			})
 			break
 		}
 		var eventData contracts.EventData

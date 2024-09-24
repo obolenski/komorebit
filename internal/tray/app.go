@@ -106,6 +106,9 @@ func (a *App) HandleEvent(eventData contracts.EventData) {
 	if eventData.Event.Type == "TogglePause" {
 		a.togglePause()
 		return
+	} else if eventData.Event.Type == "KomorebiStopped" {
+		a.beSad()
+		return
 	}
 
 	activeMonitorIndex := int(eventData.State.Monitors.Focused)
@@ -214,12 +217,11 @@ func (a *App) updateIcon() {
 
 func (a *App) monitorKomorebi() {
 	for {
-		_, err := komorebic.Exec([]string{"state"})
-		if err != nil && !a.state.isSad {
-			fmt.Println("Komorebi is not running. Entering sad state...")
-			a.beSad()
+		if a.state.isSad {
+			a.hope()
+		} else {
+			time.Sleep(5 * time.Second)
 		}
-		time.Sleep(1 * time.Second)
 	}
 }
 
@@ -233,20 +235,20 @@ func (a *App) beSad() {
 }
 
 func (a *App) hope() {
-	for {
-		fmt.Println("Hoping...")
-		_, err := komorebic.Exec([]string{"state"})
-		if err == nil {
-			fmt.Println("Komorebi is running again. Recovering from sad state...")
-			a.state.mu.Lock()
-			a.state.isSad = false
-			a.state.mu.Unlock()
-			a.initEvents()
-			a.updateIcon()
-			break
-		}
-		time.Sleep(1 * time.Second)
+	fmt.Println("Hoping...")
+	_, err := komorebic.Exec([]string{"state"})
+	if err == nil {
+		a.beHappy()
 	}
+	time.Sleep(1 * time.Second)
+}
+
+func (a *App) beHappy() {
+	a.state.mu.Lock()
+	a.state.isSad = false
+	a.state.mu.Unlock()
+	a.initEvents()
+	a.updateIcon()
 }
 
 func (a *App) stopEvents() {
