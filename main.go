@@ -20,8 +20,6 @@ func main() {
 	onReady := func() {
 		fmt.Println("Hi")
 		app.Init(eventManager)
-		eventManager.Start()
-		events.Subscribe()
 	}
 
 	systray.Run(onReady, onExit)

@@ -30,6 +30,7 @@ type AppState struct {
 	activeLayout         string
 	isPaused             bool
 	isSad                bool
+	isInit               bool
 	mu                   sync.Mutex
 }
 
@@ -51,6 +52,8 @@ func GetApp() *App {
 				activeWorkspaceIndex: 0,
 				activeLayout:         "",
 				isPaused:             false,
+				isSad:                false,
+				isInit:               true,
 			},
 			menu: AppMenuItems{
 				layoutChangeBtns:    make(map[string]*systray.MenuItem),
@@ -217,7 +220,7 @@ func (a *App) updateIcon() {
 
 func (a *App) monitorKomorebi() {
 	for {
-		if a.state.isSad {
+		if a.state.isSad || a.state.isInit {
 			a.hope()
 		} else {
 			time.Sleep(5 * time.Second)
@@ -246,6 +249,7 @@ func (a *App) hope() {
 func (a *App) beHappy() {
 	a.state.mu.Lock()
 	a.state.isSad = false
+	a.state.isInit = false
 	a.state.mu.Unlock()
 	a.initEvents()
 	a.updateIcon()
