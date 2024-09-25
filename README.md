@@ -19,7 +19,9 @@ Yet another tray indicator for [komorebi](https://github.com/LGUG2Z/komorebi/)
 - Has a menu with a few buttons
 
 ## Installation
-For daily use, make sure to build with a console-hiding flag:
+The executable is available under [release assets](https://github.com/obolenski/komorebit/releases)
+
+Or build it yourself with a console-hiding flag:
 ```
 go build -ldflags "-H=windowsgui"
 ```
