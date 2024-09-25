@@ -156,14 +156,11 @@ func (a *App) handleReloadButton() {
 		<-a.menu.reloadBtn.ClickedCh
 		fmt.Println("Requesting reload")
 		systray.SetIcon(icons.TildeIcon())
-		a.stopEvents()
 		komorebic.Exec([]string{"stop"})
 		_, err := komorebic.Exec([]string{"start"})
 		if err != nil {
-			systray.SetIcon(icons.SadIcon())
 			fmt.Println("Error reloading komorebi")
 		} else {
-			a.initEvents()
 			fmt.Println("Finished reloading")
 		}
 	}
